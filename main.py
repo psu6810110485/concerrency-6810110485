@@ -1,11 +1,28 @@
 import asyncio
 import time
 import sys
+import math
+import re
 import aiohttp
+from concurrent.futures import ProcessPoolExecutor
 
 # ==========================================
-# 1. Asyncio: ดึงข้อมูลจาก API สภาพอากาศพร้อมกัน
+# 3. Process Pool: คำนวณโมเดลสภาพอากาศ (CPU-Bound)
 # ==========================================
+def run_climate_simulation(weather_data):
+    city, temp_text = weather_data
+    match = re.search(r'-?\d+', temp_text)
+    if not match:
+        return f"📍 {city}: ดึงข้อมูลล้มเหลว"
+    
+    temp_celsius = int(match.group())
+    
+    simulation_result = 0
+    for i in range(5_000_000): # จำลองการทำงานหนัก
+        simulation_result += math.sin(temp_celsius) * math.cos(i % 100)
+    
+    return f"📍 {city}: อุณหภูมิจริง {temp_celsius}°C | (วิเคราะห์เสร็จสิ้น: {abs(simulation_result):.2f})"
+
 async def fetch_real_temperature(session, city):
     url = f"https://wttr.in/{city}?format=%t"
     try:
@@ -21,14 +38,19 @@ async def main():
 
     cities = ["Songkhla", "Bangkok", "Chiang Mai", "Phuket"]
     
-    # --- เริ่ม Asyncio ---
     async with aiohttp.ClientSession() as session:
         tasks = [fetch_real_temperature(session, city) for city in cities]
         real_weather_data = await asyncio.gather(*tasks)
 
-    print("✅ ดึงอุณหภูมิปัจจุบันสำเร็จ:")
-    for data in real_weather_data:
-        print(f"📍 {data[0]}: {data[1]}")
+    print("✅ ดึงข้อมูลสำเร็จ กำลังส่งให้ Process Pool คำนวณ...")
+
+    # --- เริ่ม Process Pool ---
+    with ProcessPoolExecutor() as executor:
+        results = list(executor.map(run_climate_simulation, real_weather_data))
+
+    print("\n📊 ผลลัพธ์การประมวลผลอุณหภูมิ:")
+    for res in results:
+        print(res)
 
     print(f"\n🎉 ทำงานเสร็จสิ้นภายใน: {time.time() - start_time:.2f} วินาที")
 
